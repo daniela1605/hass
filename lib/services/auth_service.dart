@@ -310,6 +310,7 @@ class AuthService {
   // ─── BIOMETRÍA ─────────────────────────────────────────────────────────────
 
   Future<bool> biometriaDisponible() async {
+    if (kIsWeb) return false;
     try {
       return await _localAuth.isDeviceSupported() &&
           (await _localAuth.canCheckBiometrics ||
@@ -321,6 +322,7 @@ class AuthService {
 
   /// Huella, rostro o, si no hay, el PIN/patrón del dispositivo.
   Future<bool> autenticarBiometria(String motivo) async {
+    if (kIsWeb) return false;
     try {
       return await _localAuth.authenticate(
         localizedReason: motivo,

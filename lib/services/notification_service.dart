@@ -26,6 +26,10 @@ class NotificationService {
 
   Future<void> init() async {
     if (_iniciado) return;
+    if (kIsWeb) {
+      _iniciado = true;
+      return;
+    }
     try {
       const android = AndroidInitializationSettings('@mipmap/ic_launcher');
       const ios = DarwinInitializationSettings();
@@ -38,6 +42,7 @@ class NotificationService {
 
   /// Pide permiso de notificaciones (Android 13+ / iOS).
   Future<void> pedirPermiso() async {
+    if (kIsWeb) return;
     try {
       await _plugin
           .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()
@@ -53,6 +58,7 @@ class NotificationService {
   /// Muestra solo la notificación del sistema (sin guardar en la bandeja).
   /// Útil para el "SMS simulado" del modo demo.
   Future<void> mostrarSistema(String titulo, String cuerpo, {String tipo = 'sistema'}) async {
+    if (kIsWeb) return;
     if (!_iniciado) return;
     final canal = _canales[tipo] ?? _canales['sistema']!;
     try {

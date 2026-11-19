@@ -1,11 +1,9 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
-import '../controllers/saldo_proveedor_controller.dart';
 import '../repository/database_helper.dart';
 import '../services/mail_helper.dart';
 import '../services/notification_service.dart';
 import '../theme/app_theme.dart';
-import '../widgets/fondear_saldo_sheet.dart';
 import '../widgets/gestopago_ticket_dialog.dart';
 import '../widgets/product_image.dart';
 import 'pago_view.dart';
@@ -43,21 +41,9 @@ class _CarritoViewState extends State<CarritoView> {
     await _cargarCarrito();
   }
 
-  /// 1) Validar fondos en Bolsa GestoPago 2) Elegir método de pago 3) Registrar con Folio Oficial
+  /// Pasarela de pago: El usuario selecciona su método de pago preferido
   Future<void> _finalizarCompra() async {
     if (_cart.isEmpty) return;
-
-    await SaldoProveedorController.instance.init();
-    if (!mounted) return;
-    if (!SaldoProveedorController.instance.validarFondosConAlerta(
-      context,
-      montoRequerido: _total,
-      conceptoOperacion: 'Compra de Carrito (\$${_total.toStringAsFixed(2)} MXN)',
-      onAbrirModalFondeo: () =>
-          FondearSaldoSheet.mostrar(context, emailUsuario: widget.usuarioEmail),
-    )) {
-      return;
-    }
 
     final pago = await Navigator.push<ResultadoPago>(
       context,
@@ -66,7 +52,7 @@ class _CarritoViewState extends State<CarritoView> {
     );
     if (pago == null || !mounted) return; // el usuario canceló
 
-    // El Folio Oficial proviene exclusivamente de la autorización del proveedor
+    // El Folio Oficial proviene exclusivamente de la autorización del pago
     final folioRemision = pago.referencia;
     final fechaCompra = DateTime.now();
 
@@ -142,17 +128,34 @@ class _CarritoViewState extends State<CarritoView> {
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
             title: Row(
               children: [
-                Icon(pago.pendiente ? Icons.schedule_rounded : Icons.check_circle_rounded, color: pago.pendiente ? const Color(0xFFF57C00) : const Color(0xFF81C784), size: 28),
-                SizedBox(width: 8),
-                Text(pago.pendiente ? '¡Pedido Registrado!' : '¡Pedido Confirmado!', style: TextStyle(color: AppTheme.darkPink, fontWeight: FontWeight.bold, fontSize: 18)),
+                Icon(
+                  pago.pendiente ? Icons.schedule_rounded : Icons.check_circle_rounded,
+                  color: pago.pendiente ? const Color(0xFFF57C00) : const Color(0xFF81C784),
+                  size: 28,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  pago.pendiente ? '¡Pedido Registrado!' : '¡Pedido Confirmado!',
+                  style: TextStyle(
+                    color: AppTheme.darkPink,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 18,
+                  ),
+                ),
               ],
             ),
             content: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
                 const SizedBox(height: 8),
-                Text('Total: \$${totalCompra.toStringAsFixed(2)} MXN',
-                    style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppTheme.textDark)),
+                Text(
+                  'Total: \$${totalCompra.toStringAsFixed(2)} MXN',
+                  style: const TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: AppTheme.textDark,
+                  ),
+                ),
                 const SizedBox(height: 6),
                 Text('Folio: $folioRemision', style: TextStyle(color: Colors.grey[600], fontSize: 13)),
                 const SizedBox(height: 4),
@@ -162,16 +165,21 @@ class _CarritoViewState extends State<CarritoView> {
                     Icon(ResultadoPago.icono(pago.metodo), size: 16, color: AppTheme.darkPink),
                     const SizedBox(width: 6),
                     Flexible(
-                      child: Text(pago.resumen,
-                          textAlign: TextAlign.center,
-                          style: const TextStyle(fontSize: 12.5, color: AppTheme.textDark)),
+                      child: Text(
+                        pago.resumen,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(fontSize: 12.5, color: AppTheme.textDark),
+                      ),
                     ),
                   ],
                 ),
                 if (pago.pendiente) ...[
                   const SizedBox(height: 8),
-                  const Text('Tu pedido se enviará cuando se confirme el pago.',
-                      textAlign: TextAlign.center, style: TextStyle(fontSize: 12, color: Color(0xFFF57C00))),
+                  const Text(
+                    'Tu pedido se enviará cuando se confirme el pago.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(fontSize: 12, color: Color(0xFFF57C00)),
+                  ),
                 ],
                 const SizedBox(height: 12),
                 Container(
@@ -295,8 +303,10 @@ class _CarritoViewState extends State<CarritoView> {
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           const Text('Total a pagar:', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppTheme.textDark)),
-                          Text('\$${_total.toStringAsFixed(2)} MXN',
-                              style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: AppTheme.darkPink)),
+                          Text(
+                            '\$${_total.toStringAsFixed(2)} MXN',
+                            style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: AppTheme.darkPink),
+                          ),
                         ],
                       ),
                       const SizedBox(height: 16),

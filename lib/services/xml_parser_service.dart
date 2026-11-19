@@ -132,7 +132,17 @@ class XmlParserService {
     );
   }
 
-  /// Parsea la respuesta XML de `sendTx.do` para obtener `<NUM_AUTORIZACION>`, `<ID_TX>` y `<PIN>`
+  /// Parsea la respuesta XML oficial de `sendTx.do` (`<RESPONSE>...</RESPONSE>`)
+  ///
+  /// Campos retornados por el switch oficial:
+  /// - `<ID_TX>`: Identificador único de transacción del switch (ej. 291437188)
+  /// - `<NUM_AUTORIZACION>`: Folio oficial de autorización (ej. 100024988)
+  /// - `<SALDO>` y `<SALDO_F>`: Saldo remanente de la bolsa mayorista
+  /// - `<COMISION>` y `<COMISION_F>`: Comisión aplicada
+  /// - `<FECHA>`: Fecha oficial de procesamiento (ej. 25/Feb/2022 18:15:25)
+  /// - `<MONTO>`: Monto acreditado
+  /// - `<MENSAJE>`: Contenedor con `<CODIGO>` (ej. 01) y `<TEXTO>` (ej. Operacion realizada con exito)
+  /// - `<PIN>`: Código digital generado si es tarjeta o gift card
   Map<String, String>? parseSendTxXml(String xml) {
     if (xml.trim().isEmpty || !xml.contains('<')) return null;
     final numAut = extraerValorTag(xml, 'NUM_AUTORIZACION') ??
@@ -144,17 +154,35 @@ class XmlParserService {
     if (numAut == null && idTx == null) return null;
 
     final pin = extraerValorTag(xml, 'PIN');
-    final mensaje = extraerValorTag(xml, 'MENSAJE');
-    final legend = extraerValorTag(xml, 'LEGEND');
     final saldo = extraerValorTag(xml, 'SALDO');
+    final saldoF = extraerValorTag(xml, 'SALDO_F');
+    final comision = extraerValorTag(xml, 'COMISION');
+    final comisionF = extraerValorTag(xml, 'COMISION_F');
+    final fecha = extraerValorTag(xml, 'FECHA');
+    final monto = extraerValorTag(xml, 'MONTO');
+    final legend = extraerValorTag(xml, 'LEGEND');
+
+    // Tags dentro de <MENSAJE>
+    final codigo = extraerValorTag(xml, 'CODIGO');
+    final texto = extraerValorTag(xml, 'TEXTO');
+    final referencia = extraerValorTag(xml, 'REFERENCIA');
+    final mensajeRaw = extraerValorTag(xml, 'MENSAJE');
 
     return {
-      'NUM_AUTORIZACION': ?numAut,
-      'ID_TX': ?idTx,
-      'PIN': ?pin,
-      'MENSAJE': ?mensaje,
-      'LEGEND': ?legend,
-      'SALDO': ?saldo,
+      if (numAut != null) 'NUM_AUTORIZACION': numAut,
+      if (idTx != null) 'ID_TX': idTx,
+      if (pin != null) 'PIN': pin,
+      if (saldo != null) 'SALDO': saldo,
+      if (saldoF != null) 'SALDO_F': saldoF,
+      if (comision != null) 'COMISION': comision,
+      if (comisionF != null) 'COMISION_F': comisionF,
+      if (fecha != null) 'FECHA': fecha,
+      if (monto != null) 'MONTO': monto,
+      if (codigo != null) 'CODIGO': codigo,
+      if (texto != null) 'TEXTO': texto,
+      if (referencia != null) 'REFERENCIA': referencia,
+      if (mensajeRaw != null) 'MENSAJE': texto ?? mensajeRaw,
+      if (legend != null) 'LEGEND': legend,
     };
   }
 

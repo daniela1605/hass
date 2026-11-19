@@ -1,4 +1,6 @@
+import 'package:flutter/foundation.dart';
 import 'package:sqflite/sqflite.dart';
+import 'package:sqflite_common_ffi_web/sqflite_ffi_web.dart';
 import 'package:path/path.dart' as p;
 import '../config/app_config.dart';
 import '../models/usuario.dart';
@@ -19,6 +21,18 @@ class DatabaseHelper {
   }
 
   Future<Database> _initDB(String filePath) async {
+    if (kIsWeb) {
+      final factory = databaseFactoryFfiWeb;
+      return await factory.openDatabase(
+        filePath,
+        options: OpenDatabaseOptions(
+          version: _version,
+          onConfigure: (db) async => db.execute('PRAGMA foreign_keys = ON'),
+          onCreate: _createDB,
+          onUpgrade: _onUpgrade,
+        ),
+      );
+    }
     final dbPath = await getDatabasesPath();
     final path = p.join(dbPath, filePath);
     return await openDatabase(

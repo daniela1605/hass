@@ -126,6 +126,16 @@ class SecurityService {
   static Future<void> init() async {
     if (_key != null) return;
     String? b64;
+    if (kIsWeb) {
+      final prefs = await SharedPreferences.getInstance();
+      b64 = prefs.getString(_claveAes);
+      if (b64 == null) {
+        b64 = base64Encode(_bytesAleatorios(32));
+        await prefs.setString(_claveAes, b64);
+      }
+      _key = enc.Key(base64Decode(b64));
+      return;
+    }
     const storage = FlutterSecureStorage();
     try {
       b64 = await storage.read(key: _claveAes);

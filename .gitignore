@@ -51,3 +51,6 @@ app.*.map.json
 config/env.json
 config/env.*.json
 !config/env.example.json
+
+# Directorios temporales
+flutter_app/

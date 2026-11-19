@@ -1,4 +1,7 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:sqflite/sqflite.dart';
+import 'package:sqflite_common_ffi_web/sqflite_ffi_web.dart';
 import 'config/app_config.dart';
 import 'controllers/saldo_proveedor_controller.dart';
 import 'repository/database_helper.dart';
@@ -10,6 +13,9 @@ import 'views/login_view.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  if (kIsWeb) {
+    databaseFactory = databaseFactoryFfiWeb;
+  }
   debugPrint('[Config] ${AppConfig.resumen}');
   await SecurityService.init(); // clave AES para cifrar datos personales
   await AppSettings.instance.cargar(); // preferencias del usuario

@@ -61,6 +61,7 @@ dependencies:
   latlong2: ^0.9.1
   # Abrir "Cómo llegar" en la app de mapas
   url_launcher: ^6.3.1
+  sqflite_common_ffi_web: ^1.2.2
 
   # Fijados para evitar paquetes con "build hooks" nativos (objective_c / jni),
   # que fallan en Windows cuando la ruta del SDK o del usuario tiene espacios.
