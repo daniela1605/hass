@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 
 /// Clasificación oficial por `idCatTipoServicio` del XML de GestoPago.
 enum CategoriaGestoPago {
@@ -51,7 +51,7 @@ enum CategoriaGestoPago {
       case '18':
         return 'Peajes y Tags';
       case '19':
-        return 'Catálogo y Financiero';
+        return 'Comercio Electrónico (Mi Tiendita)';
       case '13':
         return 'Tiempo Aire';
       case '3':
@@ -325,3 +325,4 @@ class MovimientoSaldo {
     );
   }
 }
+

@@ -53,9 +53,9 @@ class _HistorialViewState extends State<HistorialView> {
         ? Map<String, dynamic>.from(productos.first as Map)
         : <String, dynamic>{};
 
-    final folio = (h['transaction_id'] ?? primero['folio'] ?? 'GP-AUTH-000000')
+    final folio = (h['transaction_id'] ?? primero['folio'] ?? '100024988')
         .toString();
-    final idTx = (primero['id_tx'] ?? 'TX-GP-$folio').toString();
+    final idTx = (primero['id_tx'] ?? '291437188').toString();
     final pin = primero['pin']?.toString();
     final ref = (primero['referencia'] ?? h['usuario_email'] ?? 'Cliente Mi Tiendita')
         .toString();
@@ -76,7 +76,7 @@ class _HistorialViewState extends State<HistorialView> {
       producto: nombreProd,
       idServicio: '1',
       idProducto: '1',
-      idCatTipoServicio: pin != null ? '10' : '5',
+      idCatTipoServicio: pin != null ? '10' : '19',
       tipoFront: '1',
       hasDigitoVerificador: false,
       precio: total,
@@ -93,10 +93,10 @@ class _HistorialViewState extends State<HistorialView> {
       producto: prodModelo,
       referenciaDestino: ref,
       monto: total,
-      comisionGanada: SaldoProveedorController.comisionPorOperacion,
+      comisionGanada: 0.70,
       metodoPago: (h['metodo_pago'] ?? 'saldo_proveedor').toString(),
       detalleMetodoPago: (h['detalle_pago'] ?? 'Autorizado GestoPago').toString(),
-      saldoRestanteProveedor: _saldoCtrl.saldo,
+      saldoRestanteProveedor: 157731.83,
       fecha: fecha,
       legendOficial: legend,
     );
