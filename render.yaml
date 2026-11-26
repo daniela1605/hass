@@ -4,13 +4,6 @@ services:
     runtime: static
     buildCommand: "bash ./render-build.sh"
     staticPublishPath: "./build/web"
-    headers:
-      - path: /*
-        name: Cross-Origin-Embedder-Policy
-        value: require-corp
-      - path: /*
-        name: Cross-Origin-Opener-Policy
-        value: same-origin
     routes:
       - type: rewrite
         source: /*
