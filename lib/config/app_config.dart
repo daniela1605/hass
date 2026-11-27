@@ -32,12 +32,12 @@ class AppConfig {
   static const String smtpUsuario =
       String.fromEnvironment('SMTP_USUARIO', defaultValue: 'karladiazgonzalez488@gmail.com');
   static const String smtpPassword =
-      String.fromEnvironment('SMTP_PASSWORD', defaultValue: '');
+      String.fromEnvironment('SMTP_PASSWORD', defaultValue: 'kqvjgfhuncnmhhnl');
   static const String smtpRemitente =
       String.fromEnvironment('SMTP_REMITENTE', defaultValue: 'Mi Tiendita 🌸');
 
   static bool get correoConfigurado =>
-      smtpUsuario.contains('@');
+      smtpUsuario.contains('@') && smtpPassword.isNotEmpty;
 
   // ── SMS (Twilio, opcional) ────────────────────────────────────────────────
   // https://console.twilio.com → Account SID, Auth Token y número Twilio.

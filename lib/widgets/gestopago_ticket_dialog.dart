@@ -4,6 +4,7 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../models/gestopago_models.dart';
 import '../theme/app_theme.dart';
 import '../services/mail_helper.dart';
@@ -68,11 +69,32 @@ class _GestoPagoTicketDialogState extends State<GestoPagoTicketDialog> {
           SnackBar(
             behavior: SnackBarBehavior.floating,
             backgroundColor: exito ? AppTheme.darkPink : Colors.orange[800],
-            duration: const Duration(seconds: 3),
+            duration: const Duration(seconds: 4),
             content: Text(
               exito
                   ? '📧 Comprobante oficial enviado exitosamente a $destino'
                   : '⚠️ No se pudo enviar el correo a $destino (revisa tu configuración en Ajustes).',
+            ),
+            action: SnackBarAction(
+              label: 'Abrir Gmail',
+              textColor: Colors.white,
+              onPressed: () async {
+                final asunto = Uri.encodeComponent(
+                    '🧾 Comprobante Oficial GestoPago - Folio ${widget.resultado.folioAutorizacion}');
+                final cuerpo = Uri.encodeComponent(
+                    'Comprobante Oficial GestoPago\n'
+                    'Folio Autorización: ${widget.resultado.folioAutorizacion}\n'
+                    'ID Transacción: ${widget.resultado.idTx}\n'
+                    'Monto: \$${widget.resultado.monto.toStringAsFixed(2)} MXN\n'
+                    'Método: ${widget.resultado.detalleMetodoPago}\n'
+                    'Fecha: ${widget.resultado.fecha}\n\n'
+                    '${widget.resultado.legendOficial}');
+                final url = Uri.parse(
+                    'https://mail.google.com/mail/?view=cm&fs=1&to=$destino&su=$asunto&body=$cuerpo');
+                if (await canLaunchUrl(url)) {
+                  await launchUrl(url, mode: LaunchMode.externalApplication);
+                }
+              },
             ),
           ),
         );
