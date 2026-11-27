@@ -6,6 +6,8 @@ import 'package:intl/intl.dart';
 import 'package:share_plus/share_plus.dart';
 import '../models/gestopago_models.dart';
 import '../theme/app_theme.dart';
+import '../services/mail_helper.dart';
+import '../services/app_settings.dart';
 
 /// Comprobante Oficial (`GestoPagoTicketDialog`) post-pago.
 /// Permite compartir el comprobante en formato de IMAGEN PNG (en lugar de solo texto)
@@ -33,6 +35,49 @@ class GestoPagoTicketDialog extends StatefulWidget {
 class _GestoPagoTicketDialogState extends State<GestoPagoTicketDialog> {
   final GlobalKey _ticketKey = GlobalKey();
   bool _generandoImagen = false;
+  bool _enviandoCorreo = false;
+
+  Future<void> _enviarTicketPorCorreo() async {
+    if (_enviandoCorreo) return;
+    setState(() => _enviandoCorreo = true);
+    final destino = widget.resultado.referenciaDestino.contains('@')
+        ? widget.resultado.referenciaDestino
+        : AppSettings.instance.smtpUsuario;
+
+    final exito = await MailHelper.sendPurchaseSummaryEmail(
+      destino,
+      [
+        {
+          'nombre_product': widget.resultado.producto.producto,
+          'precio': widget.resultado.monto,
+          'cantidad': 1,
+        }
+      ],
+      widget.resultado.monto,
+      widget.resultado.folioAutorizacion,
+      widget.resultado.fecha,
+      null,
+      widget.resultado.detalleMetodoPago,
+    );
+
+    if (mounted) {
+      setState(() => _enviandoCorreo = false);
+      ScaffoldMessenger.of(context)
+        ..clearSnackBars()
+        ..showSnackBar(
+          SnackBar(
+            behavior: SnackBarBehavior.floating,
+            backgroundColor: exito ? AppTheme.darkPink : Colors.orange[800],
+            duration: const Duration(seconds: 3),
+            content: Text(
+              exito
+                  ? '📧 Comprobante oficial enviado exitosamente a $destino'
+                  : '⚠️ No se pudo enviar el correo a $destino (revisa tu configuración en Ajustes).',
+            ),
+          ),
+        );
+    }
+  }
 
   void _copiarTexto(String valor, String etiqueta) {
     Clipboard.setData(ClipboardData(text: valor));
@@ -633,28 +678,61 @@ class _GestoPagoTicketDialogState extends State<GestoPagoTicketDialog> {
                   Expanded(
                     child: ElevatedButton.icon(
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: AppTheme.darkPink,
-                        foregroundColor: Colors.white,
+                        backgroundColor: Colors.white,
+                        foregroundColor: const Color(0xFF0288D1),
                         elevation: 2,
+                        side: const BorderSide(color: Color(0xFF0288D1), width: 1.6),
                         padding: const EdgeInsets.symmetric(vertical: 12),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(14),
                         ),
                       ),
-                      onPressed: () => Navigator.of(context).pop(),
-                      icon: const Icon(
-                        Icons.check_circle_outline_rounded,
-                        size: 20,
-                      ),
-                      label: const Text(
-                        'Aceptar y Cerrar',
+                      onPressed: _enviandoCorreo ? null : _enviarTicketPorCorreo,
+                      icon: _enviandoCorreo
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Color(0xFF0288D1),
+                              ),
+                            )
+                          : const Icon(Icons.mark_email_read_rounded, size: 20),
+                      label: Text(
+                        _enviandoCorreo ? 'Enviando...' : 'Enviar Correo',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: TextStyle(fontWeight: FontWeight.bold),
+                        style: const TextStyle(fontWeight: FontWeight.bold),
                       ),
                     ),
                   ),
                 ],
+              ),
+              const SizedBox(height: 10),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppTheme.darkPink,
+                    foregroundColor: Colors.white,
+                    elevation: 2,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                  ),
+                  onPressed: () => Navigator.of(context).pop(),
+                  icon: const Icon(
+                    Icons.check_circle_outline_rounded,
+                    size: 20,
+                  ),
+                  label: const Text(
+                    'Aceptar y Cerrar',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                ),
               ),
             ],
           ),

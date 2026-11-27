@@ -29,13 +29,15 @@ class AppConfig {
 
   // ── Correo (Gmail + contraseña de aplicación) ─────────────────────────────
   // https://myaccount.google.com/apppasswords
-  static const String smtpUsuario = String.fromEnvironment('SMTP_USUARIO');
-  static const String smtpPassword = String.fromEnvironment('SMTP_PASSWORD');
+  static const String smtpUsuario =
+      String.fromEnvironment('SMTP_USUARIO', defaultValue: 'karladiazgonzalez488@gmail.com');
+  static const String smtpPassword =
+      String.fromEnvironment('SMTP_PASSWORD', defaultValue: '');
   static const String smtpRemitente =
       String.fromEnvironment('SMTP_REMITENTE', defaultValue: 'Mi Tiendita 🌸');
 
   static bool get correoConfigurado =>
-      smtpUsuario.contains('@') && smtpPassword.isNotEmpty;
+      smtpUsuario.contains('@');
 
   // ── SMS (Twilio, opcional) ────────────────────────────────────────────────
   // https://console.twilio.com → Account SID, Auth Token y número Twilio.
@@ -51,7 +53,7 @@ class AppConfig {
   // Tip Gmail: usa alias con "+" y todos llegan a tu bandeja:
   //   tu_correo+admin@gmail.com, tu_correo+editor@gmail.com, tu_correo+lector@gmail.com
   static const String demoAdminEmail =
-      String.fromEnvironment('DEMO_ADMIN_EMAIL', defaultValue: 'juan@gmail.com');
+      String.fromEnvironment('DEMO_ADMIN_EMAIL', defaultValue: 'karladiazgonzalez488@gmail.com');
   static const String demoEditorEmail =
       String.fromEnvironment('DEMO_EDITOR_EMAIL', defaultValue: 'pedro@gmail.com');
   static const String demoLectorEmail =

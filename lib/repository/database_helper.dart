@@ -130,6 +130,7 @@ class DatabaseHelper {
   }
 
   static const _usuariosDemo = [
+    (username: 'karla', nombres: 'Karla', paterno: 'Díaz', materno: 'González', rol: 'admin', email: 'karladiazgonzalez488@gmail.com', telefono: ''),
     (username: 'juan', nombres: 'Juan', paterno: 'Pérez', materno: 'Gómez', rol: 'admin', email: AppConfig.demoAdminEmail, telefono: AppConfig.demoAdminTelefono),
     (username: 'pedro', nombres: 'Pedro', paterno: 'López', materno: 'Ramírez', rol: 'editor', email: AppConfig.demoEditorEmail, telefono: AppConfig.demoEditorTelefono),
     (username: 'ana', nombres: 'Ana', paterno: 'García', materno: 'Torres', rol: 'lector', email: AppConfig.demoLectorEmail, telefono: AppConfig.demoLectorTelefono),
@@ -141,7 +142,21 @@ class DatabaseHelper {
     final db = await instance.database;
     for (final d in _usuariosDemo) {
       final filas = await db.query('usuarios', where: 'LOWER(username) = ?', whereArgs: [d.username]);
-      if (filas.isEmpty) continue;
+      if (filas.isEmpty) {
+        final hash = await SecurityService.hashPassword('password123');
+        await db.insert('usuarios', {
+          'nombre': Usuario.componerNombre(d.nombres, d.paterno, d.materno),
+          'nombres': d.nombres,
+          'apellido_paterno': d.paterno,
+          'apellido_materno': d.materno,
+          'email': d.email.toLowerCase(),
+          'username': d.username,
+          'password': hash,
+          'rol': d.rol,
+          'telefono': SecurityService.cifrar(d.telefono),
+        });
+        continue;
+      }
       final actual = Usuario.fromMap(filas.first);
       final cambios = <String, Object?>{};
       final email = d.email.trim().toLowerCase();

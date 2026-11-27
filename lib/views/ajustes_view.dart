@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import '../repository/database_helper.dart';
 import '../services/app_settings.dart';
 import '../services/auth_service.dart';
+import '../services/mail_helper.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../services/notification_service.dart';
 import '../services/security_service.dart';
 import '../services/usuario_service.dart';
@@ -233,6 +235,7 @@ class _AjustesViewState extends State<AjustesView> {
                     items: [
                       const DropdownMenuItem(value: 'email', child: Text('Correo')),
                       DropdownMenuItem(value: 'sms', enabled: u.tieneTelefono, child: const Text('SMS')),
+                      const DropdownMenuItem(value: 'totp', child: Text('Google Authenticator')),
                     ],
                     onChanged: (v) {
                       if (v != null) _settings.setCanal2fa(v);
@@ -250,6 +253,52 @@ class _AjustesViewState extends State<AjustesView> {
                   leading: Icon(Icons.enhanced_encryption_outlined),
                   title: Text('Cifrado de datos'),
                   subtitle: Text('Contraseñas con hash PBKDF2-SHA256 y teléfono cifrado con AES-256-GCM.'),
+                ),
+              ],
+            ),
+          ),
+
+          // ── Servidor de Correo (Gmail) ────────────────────────────────────
+          _titulo('Envío de Correo (Gmail)', Icons.mark_email_read_outlined),
+          Card(
+            child: Column(
+              children: [
+                ListTile(
+                  leading: Icon(Icons.email_rounded, color: AppTheme.darkPink),
+                  title: const Text('Correo emisor (Gmail)'),
+                  subtitle: Text(_settings.smtpUsuario),
+                  trailing: const Icon(Icons.lock_rounded, size: 18, color: Colors.grey),
+                ),
+                ListTile(
+                  leading: Icon(Icons.key_rounded, color: AppTheme.darkPink),
+                  title: const Text('Contraseña de aplicación (16 letras)'),
+                  subtitle: Text(
+                    _settings.correoConfigurado
+                        ? '•••• •••• •••• •••• (Configurada y activa)'
+                        : 'No configurada (Modo simulación)',
+                    style: TextStyle(
+                      color: _settings.correoConfigurado ? Colors.green[700] : Colors.orange[800],
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  trailing: TextButton(
+                    onPressed: _configurarSmtpDialog,
+                    child: const Text('Configurar'),
+                  ),
+                ),
+                ListTile(
+                  leading: const Icon(Icons.help_outline_rounded, color: Colors.blue),
+                  title: const Text('¿Dónde veo mi llave de 2 pasos de Google?'),
+                  subtitle: const Text('Guía paso a paso para generar tu contraseña de 16 letras en Gmail'),
+                  trailing: const Icon(Icons.chevron_right_rounded),
+                  onTap: _mostrarGuiaLlaveGoogle,
+                ),
+                ListTile(
+                  leading: Icon(Icons.send_rounded, color: AppTheme.darkPink),
+                  title: const Text('Enviar correo de prueba'),
+                  subtitle: Text('Envía un correo de verificación a ${_settings.smtpUsuario}'),
+                  trailing: const Icon(Icons.chevron_right_rounded),
+                  onTap: _enviarCorreoPrueba,
                 ),
               ],
             ),
@@ -287,6 +336,193 @@ class _AjustesViewState extends State<AjustesView> {
         decoration: BoxDecoration(color: AppTheme.softPinkBg, borderRadius: BorderRadius.circular(8)),
         child: Text(t, style: TextStyle(fontSize: 11, color: AppTheme.darkPink, fontWeight: FontWeight.w600)),
       );
+
+  Future<void> _configurarSmtpDialog() async {
+    final passCtrl = TextEditingController(text: _settings.smtpPassword);
+    final formKey = GlobalKey<FormState>();
+
+    final guardado = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Row(
+          children: [
+            Icon(Icons.mark_email_read_rounded, color: AppTheme.darkPink),
+            const SizedBox(width: 8),
+            const Text('Contraseña de Aplicación', style: TextStyle(fontSize: 18)),
+          ],
+        ),
+        content: Form(
+          key: formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Ingresa la contraseña de aplicación de 16 caracteres generada en tu cuenta de Google (${_settings.smtpUsuario}):',
+                style: const TextStyle(fontSize: 13),
+              ),
+              const SizedBox(height: 14),
+              TextFormField(
+                controller: passCtrl,
+                obscureText: false,
+                decoration: const InputDecoration(
+                  labelText: 'Clave de 16 letras',
+                  hintText: 'abcd efgh ijkl mnop',
+                  prefixIcon: Icon(Icons.vpn_key_rounded),
+                ),
+                validator: (v) {
+                  final s = (v ?? '').replaceAll(' ', '').trim();
+                  if (s.isEmpty) return 'Ingresa tu contraseña de aplicación.';
+                  if (s.length != 16) return 'Debe tener exactamente 16 letras.';
+                  return null;
+                },
+              ),
+              const SizedBox(height: 10),
+              TextButton.icon(
+                icon: const Icon(Icons.help_outline_rounded, size: 16),
+                label: const Text('¿Cómo generar esta clave?', style: TextStyle(fontSize: 12)),
+                onPressed: () {
+                  Navigator.pop(ctx);
+                  _mostrarGuiaLlaveGoogle();
+                },
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancelar')),
+          ElevatedButton(
+            onPressed: () {
+              if (formKey.currentState!.validate()) {
+                Navigator.pop(ctx, true);
+              }
+            },
+            child: const Text('Guardar'),
+          ),
+        ],
+      ),
+    );
+
+    if (guardado == true) {
+      final claveLimpia = passCtrl.text.replaceAll(' ', '').trim();
+      await _settings.setSmtpConfig(_settings.smtpUsuario, claveLimpia);
+      if (mounted) {
+        mostrarMensaje(context, '✅ Contraseña de aplicación guardada correctamente.');
+      }
+    }
+  }
+
+  void _mostrarGuiaLlaveGoogle() {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Row(
+          children: [
+            Icon(Icons.security_rounded, color: AppTheme.darkPink, size: 28),
+            const SizedBox(width: 8),
+            const Flexible(
+              child: Text('¿Dónde veo mi llave de 2 pasos?', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            ),
+          ],
+        ),
+        content: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                'Google NO permite usar tu contraseña habitual para enviar correos desde apps externas. '
+                'Debes generar una "Contraseña de Aplicación" de 16 letras siguiendo estos 3 pasos:',
+                style: TextStyle(fontSize: 13, height: 1.4),
+              ),
+              const SizedBox(height: 14),
+              const Text(
+                '1️⃣ Activa la Verificación en 2 Pasos:',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppTheme.textDark),
+              ),
+              const Text(
+                'Entra a myaccount.google.com/security y asegúrate de que la "Verificación en dos pasos" esté activada.',
+                style: TextStyle(fontSize: 12, color: Colors.grey),
+              ),
+              const SizedBox(height: 10),
+              const Text(
+                '2️⃣ Entra a Contraseñas de Aplicaciones:',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppTheme.textDark),
+              ),
+              const Text(
+                'Ve directo al enlace oficial de Google: myaccount.google.com/apppasswords',
+                style: TextStyle(fontSize: 12, color: Colors.grey),
+              ),
+              const SizedBox(height: 10),
+              const Text(
+                '3️⃣ Crea la contraseña para la app:',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppTheme.textDark),
+              ),
+              const Text(
+                'Escribe como nombre "Mi Tiendita" y presiona "Crear". Google te mostrará una ventana amarilla con 16 letras (ejemplo: abcd efgh ijkl mnop). Esa es tu llave.',
+                style: TextStyle(fontSize: 12, color: Colors.grey),
+              ),
+              const SizedBox(height: 14),
+              Center(
+                child: ElevatedButton.icon(
+                  icon: const Icon(Icons.open_in_new_rounded, size: 16),
+                  label: const Text('Abrir Google App Passwords'),
+                  onPressed: () async {
+                    final uri = Uri.parse('https://myaccount.google.com/apppasswords');
+                    if (await canLaunchUrl(uri)) {
+                      await launchUrl(uri, mode: LaunchMode.externalApplication);
+                    }
+                  },
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Entendido'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _enviarCorreoPrueba() async {
+    mostrarMensaje(context, 'Enviando correo de prueba a ${_settings.smtpUsuario}...');
+    final exito = await MailHelper.sendEmail(
+      _settings.smtpUsuario,
+      '🌸 Prueba de conexión exitosa - Mi Tiendita',
+      '¡Hola Karla! Si recibes este correo, la configuración de Gmail y la contraseña de aplicación funcionan a la perfección.',
+      htmlContent: '''
+        <div style="font-family: Roboto, sans-serif; background: #FFF2F5; padding: 25px; border-radius: 16px; border: 1px solid #F8BBD0; max-width: 500px; margin: auto;">
+          <h2 style="color: #EC407A; text-align: center;">🌸 ¡Conexión Exitosa!</h2>
+          <p>Hola <strong>Karla</strong>,</p>
+          <p>Tu correo <strong>${_settings.smtpUsuario}</strong> está correctamente vinculado con <strong>Mi Tiendita</strong>.</p>
+          <div style="background: white; border-radius: 12px; padding: 15px; margin: 15px 0; border: 1px solid #F8BBD0;">
+            <p style="margin: 4px 0;">✅ <strong>Envío de notas de compra:</strong> Habilitado</p>
+            <p style="margin: 4px 0;">✅ <strong>Alertas de inicio de sesión:</strong> Habilitado</p>
+            <p style="margin: 4px 0;">✅ <strong>Fecha y hora:</strong> ${DateTime.now()}</p>
+          </div>
+          <footer style="text-align: center; font-size: 11px; color: #777;">Mi Tiendita · Sistema de correo automático</footer>
+        </div>
+      ''',
+    );
+
+    if (mounted) {
+      if (exito) {
+        mostrarMensaje(context, '🎉 ¡Correo de prueba enviado con éxito a ${_settings.smtpUsuario}!');
+      } else {
+        mostrarMensaje(
+          context,
+          '⚠️ No se pudo enviar el correo. Revisa que tu contraseña de 16 letras sea correcta.',
+          error: true,
+        );
+      }
+    }
+  }
 
   Future<void> _cambiarBiometria(bool activar, int usuarioId) async {
     final ok = await AuthService.instance.autenticarBiometria(

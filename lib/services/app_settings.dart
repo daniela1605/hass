@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../config/app_config.dart';
 
 /// Paleta de colores seleccionable por el usuario.
 class Paleta {
@@ -40,6 +41,8 @@ class AppSettings extends ChangeNotifier {
   int? _biometriaUsuarioId;
   String _canal2fa = 'email';
   bool _modoOscuro = false;
+  String _smtpUsuario = AppConfig.smtpUsuario;
+  String _smtpPassword = AppConfig.smtpPassword;
 
   Paleta get paleta => _paleta;
   double get escalaTexto => _escalaTexto;
@@ -49,6 +52,9 @@ class AppSettings extends ChangeNotifier {
   int? get biometriaUsuarioId => _biometriaUsuarioId;
   String get canal2fa => _canal2fa;
   bool get modoOscuro => _modoOscuro;
+  String get smtpUsuario => _smtpUsuario;
+  String get smtpPassword => _smtpPassword;
+  bool get correoConfigurado => _smtpUsuario.contains('@') && _smtpPassword.trim().isNotEmpty;
 
   Future<void> cargar() async {
     _prefs = await SharedPreferences.getInstance();
@@ -60,6 +66,16 @@ class AppSettings extends ChangeNotifier {
     _biometriaUsuarioId = _prefs.getInt('cfg_bio_usuario');
     _canal2fa = _prefs.getString('cfg_canal_2fa') ?? 'email';
     _modoOscuro = _prefs.getBool('cfg_modo_oscuro') ?? false;
+    _smtpUsuario = _prefs.getString('cfg_smtp_usuario') ?? AppConfig.smtpUsuario;
+    _smtpPassword = _prefs.getString('cfg_smtp_password') ?? AppConfig.smtpPassword;
+  }
+
+  Future<void> setSmtpConfig(String usuario, String password) async {
+    _smtpUsuario = usuario.trim();
+    _smtpPassword = password.trim();
+    await _prefs.setString('cfg_smtp_usuario', _smtpUsuario);
+    await _prefs.setString('cfg_smtp_password', _smtpPassword);
+    notifyListeners();
   }
 
   Future<void> setModoOscuro(bool v) async {

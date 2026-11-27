@@ -86,9 +86,8 @@ class _CarritoViewState extends State<CarritoView> {
         'cantidad': c['cantidad'] as int,
       }).toList();
 
-      bool correoEnviado = false;
       try {
-        correoEnviado = await MailHelper.sendPurchaseSummaryEmail(
+        await MailHelper.sendPurchaseSummaryEmail(
           widget.usuarioEmail,
           items,
           totalCompra,
@@ -153,102 +152,6 @@ class _CarritoViewState extends State<CarritoView> {
       if (mounted) {
         await GestoPagoTicketDialog.mostrar(context, ticketMostrar);
         if (mounted) Navigator.pop(context);
-      } else if (mounted) {
-        showDialog(
-          context: context,
-          builder: (_) => AlertDialog(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-            title: Row(
-              children: [
-                Icon(
-                  pago.pendiente ? Icons.schedule_rounded : Icons.check_circle_rounded,
-                  color: pago.pendiente ? const Color(0xFFF57C00) : const Color(0xFF81C784),
-                  size: 28,
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  pago.pendiente ? '¡Pedido Registrado!' : '¡Pedido Confirmado!',
-                  style: TextStyle(
-                    color: AppTheme.darkPink,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 18,
-                  ),
-                ),
-              ],
-            ),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const SizedBox(height: 8),
-                Text(
-                  'Total: \$${totalCompra.toStringAsFixed(2)} MXN',
-                  style: const TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                    color: AppTheme.textDark,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Text('Folio: $folioRemision', style: TextStyle(color: Colors.grey[600], fontSize: 13)),
-                const SizedBox(height: 4),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(ResultadoPago.icono(pago.metodo), size: 16, color: AppTheme.darkPink),
-                    const SizedBox(width: 6),
-                    Flexible(
-                      child: Text(
-                        pago.resumen,
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(fontSize: 12.5, color: AppTheme.textDark),
-                      ),
-                    ),
-                  ],
-                ),
-                if (pago.pendiente) ...[
-                  const SizedBox(height: 8),
-                  const Text(
-                    'Tu pedido se enviará cuando se confirme el pago.',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(fontSize: 12, color: Color(0xFFF57C00)),
-                  ),
-                ],
-                const SizedBox(height: 12),
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: AppTheme.softPinkBg,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: AppTheme.cardBorderPink),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(Icons.mark_email_read_rounded, color: AppTheme.darkPink),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Text(
-                          correoEnviado
-                              ? '📧 Tu Nota de Remisión fue enviada a:\n${widget.usuarioEmail}'
-                              : '📋 Compra guardada en tu historial.\nNo se pudo enviar el correo (sin conexión o correo no configurado).',
-                          style: TextStyle(color: AppTheme.darkPink, fontSize: 13, fontWeight: FontWeight.w600),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-            actions: [
-              ElevatedButton(
-                onPressed: () {
-                  Navigator.pop(context); // Cerrar diálogo
-                  Navigator.pop(context); // Regresar a la tienda
-                },
-                child: const Text('Aceptar y Regresar a la Tienda'),
-              ),
-            ],
-          ),
-        );
       }
     } catch (e) {
       setState(() => _isLoading = false);

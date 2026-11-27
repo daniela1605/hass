@@ -120,13 +120,24 @@ class AuthService {
       'password': 'contraseña + código 2FA',
       'google': 'Google',
       'biometria': 'biometría',
-    }[metodo];
+      'totp': 'Google Authenticator (2FA)',
+    }[metodo] ?? metodo;
     await NotificationService.instance.notificar(
       u.id!,
       'Nuevo inicio de sesión',
       'Entraste con $textoMetodo el ${_fecha(DateTime.now())}.',
       tipo: 'seguridad',
     );
+    try {
+      await MailHelper.sendLoginAlertEmail(
+        destino: u.email,
+        nombre: u.nombre,
+        metodo: textoMetodo,
+        fecha: DateTime.now(),
+      );
+    } catch (e) {
+      debugPrint('Error enviando correo de alerta de login: $e');
+    }
   }
 
   Future<void> cerrarSesion() async {
