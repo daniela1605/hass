@@ -39,6 +39,7 @@ class MyApp extends StatefulWidget {
 class _MyAppState extends State<MyApp> {
   final _settings = AppSettings.instance;
   String _paletaActual = AppSettings.instance.paleta.id;
+  bool _modoOscuroActual = AppSettings.instance.modoOscuro;
 
   @override
   void initState() {
@@ -53,12 +54,13 @@ class _MyAppState extends State<MyApp> {
   }
 
   void _alCambiarAjustes() {
-    final cambioPaleta = _paletaActual != _settings.paleta.id;
+    final cambio = _paletaActual != _settings.paleta.id || _modoOscuroActual != _settings.modoOscuro;
     _paletaActual = _settings.paleta.id;
+    _modoOscuroActual = _settings.modoOscuro;
     setState(() {});
-    if (cambioPaleta) {
+    if (cambio) {
       // Las vistas leen los colores directamente de AppTheme, así que
-      // forzamos a que todas se reconstruyan con la nueva paleta.
+      // forzamos a que todas se reconstruyan con la nueva paleta o modo oscuro.
       WidgetsBinding.instance.addPostFrameCallback((_) {
         void reconstruir(Element e) {
           e.markNeedsBuild();
@@ -75,6 +77,8 @@ class _MyAppState extends State<MyApp> {
       title: 'Mi Tiendita',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.pastelPinkTheme,
+      darkTheme: AppTheme.darkTheme,
+      themeMode: _settings.modoOscuro ? ThemeMode.dark : ThemeMode.light,
       builder: (context, child) {
         final mq = MediaQuery.of(context);
         return MediaQuery(

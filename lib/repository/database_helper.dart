@@ -498,17 +498,56 @@ class DatabaseHelper {
     return r.map((e) => e['api_id'] as int).toSet();
   }
 
-  Future<int> insertarProducto(String nombre, double precio, String? imagen,
-      {String categoria = 'General', String descripcion = ''}) async {
+  Future<int> insertarProducto(
+    String nombre,
+    double precio,
+    String? imagen, {
+    int stock = 0,
+    String categoria = 'General',
+    String descripcion = '',
+  }) async {
     final db = await instance.database;
     return await db.insert('productos', {
-      'nombre': nombre,
-      'precio': precio,
-      'stock': 1000,
+      'nombre': nombre.trim(),
+      'precio': precio > 0 ? precio : 0.01,
+      'stock': stock < 0 ? 0 : stock,
       'imagen': imagen,
-      'categoria': categoria,
-      'descripcion': descripcion,
+      'categoria': categoria.trim().isEmpty ? 'General' : categoria.trim(),
+      'descripcion': descripcion.trim(),
     });
+  }
+
+  Future<int> actualizarProducto(
+    int id, {
+    String? nombre,
+    double? precio,
+    int? stock,
+    String? imagen,
+    String? categoria,
+    String? descripcion,
+  }) async {
+    final db = await instance.database;
+    final Map<String, dynamic> data = {};
+    if (nombre != null && nombre.trim().isNotEmpty) {
+      data['nombre'] = nombre.trim();
+    }
+    if (precio != null && precio > 0) {
+      data['precio'] = precio;
+    }
+    if (stock != null) {
+      data['stock'] = stock < 0 ? 0 : stock;
+    }
+    if (imagen != null && imagen.trim().isNotEmpty) {
+      data['imagen'] = imagen.trim();
+    }
+    if (categoria != null && categoria.trim().isNotEmpty) {
+      data['categoria'] = categoria.trim();
+    }
+    if (descripcion != null) {
+      data['descripcion'] = descripcion.trim();
+    }
+    if (data.isEmpty) return 0;
+    return await db.update('productos', data, where: 'id = ?', whereArgs: [id]);
   }
 
   Future<int> eliminarProducto(int id) async {

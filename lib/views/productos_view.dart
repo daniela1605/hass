@@ -1,3 +1,4 @@
+import '../services/app_settings.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
@@ -176,6 +177,16 @@ class _ProductosViewState extends State<ProductosView> {
           ],
         ),
         actions: [
+          IconButton(
+            tooltip: AppSettings.instance.modoOscuro ? 'Modo claro' : 'Modo oscuro',
+            onPressed: () {
+              AppSettings.instance.setModoOscuro(!AppSettings.instance.modoOscuro);
+            },
+            icon: Icon(
+              AppSettings.instance.modoOscuro ? Icons.light_mode_rounded : Icons.dark_mode_rounded,
+              color: AppTheme.darkPink,
+            ),
+          ),
           const NotificacionesBoton(),
           IconButton(
             tooltip: 'Carrito',
@@ -632,10 +643,39 @@ class _ProductosViewState extends State<ProductosView> {
                         style: TextStyle(color: AppTheme.darkPink, fontWeight: FontWeight.bold, fontSize: 13),
                       ),
                       const SizedBox(height: 2),
-                      Text(
-                        '${product['categoria']} · Stock: ${product['cantidad']}',
-                        style: TextStyle(color: Colors.grey[600], fontSize: 12),
-                      ),
+                      Builder(builder: (context) {
+                        final int stockVal = product['cantidad'] is int
+                            ? product['cantidad'] as int
+                            : int.tryParse(product['cantidad']?.toString() ?? '0') ?? 0;
+                        final bool esAgotado = stockVal <= 0;
+                        return Row(
+                          children: [
+                            Text(
+                              '${product['categoria']} · ',
+                              style: TextStyle(color: Colors.grey[600], fontSize: 12),
+                            ),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                              decoration: BoxDecoration(
+                                color: esAgotado ? Colors.red.shade50 : AppTheme.softPinkBg,
+                                borderRadius: BorderRadius.circular(6),
+                                border: Border.all(
+                                  color: esAgotado ? Colors.red.shade300 : AppTheme.cardBorderPink,
+                                  width: 0.8,
+                                ),
+                              ),
+                              child: Text(
+                                esAgotado ? 'Agotado (0)' : 'Stock: $stockVal',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                  color: esAgotado ? Colors.red.shade700 : AppTheme.darkPink,
+                                ),
+                              ),
+                            ),
+                          ],
+                        );
+                      }),
                     ],
                   ),
                 ),
@@ -663,12 +703,18 @@ class _ProductosViewState extends State<ProductosView> {
                           tooltip: 'Compartir',
                           onPressed: () => _compartir(product),
                         ),
-                        if (_puedeEditar)
+                        if (_puedeEditar) ...[
+                          IconButton(
+                            icon: Icon(Icons.edit_note_rounded, color: AppTheme.darkPink, size: 21),
+                            tooltip: 'Editar producto (Stock y Costo)',
+                            onPressed: () => _showEditProductDialog(product),
+                          ),
                           IconButton(
                             icon: Icon(Icons.delete_outline_rounded, color: Colors.red.shade400, size: 18),
                             tooltip: 'Eliminar producto',
                             onPressed: () => _confirmarEliminarProducto(product),
                           ),
+                        ],
                       ],
                     ),
                   ],
@@ -746,12 +792,26 @@ class _ProductosViewState extends State<ProductosView> {
   }
 
   void _dialogoCantidad(Map<String, dynamic> product) {
+    final int stockActual = product['cantidad'] is int
+        ? product['cantidad'] as int
+        : int.tryParse(product['cantidad']?.toString() ?? '0') ?? 0;
+
+    if (stockActual <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('⚠️ Este producto se encuentra agotado actualmente.'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
     final quantityController = TextEditingController(text: '1');
     showDialog(
       context: context,
       builder: (BuildContext ctx) {
         return AlertDialog(
-          backgroundColor: Colors.white,
+          backgroundColor: AppTheme.dialogBg,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
           title: Text(
             'Seleccionar Cantidad 🛍️',
@@ -764,7 +824,10 @@ class _ProductosViewState extends State<ProductosView> {
               Text(product['nombre_product'], style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
               const SizedBox(height: 6),
               Text('Precio: \$${(product['precio'] as num).toStringAsFixed(2)} MXN',
-                  style: TextStyle(color: AppTheme.darkPink)),
+                  style: TextStyle(color: AppTheme.darkPink, fontWeight: FontWeight.w600)),
+              const SizedBox(height: 4),
+              Text('Disponibles en inventario: $stockActual',
+                  style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
               const SizedBox(height: 12),
               TextField(
                 controller: quantityController,
@@ -782,6 +845,21 @@ class _ProductosViewState extends State<ProductosView> {
             ElevatedButton(
               onPressed: () {
                 final quantity = int.tryParse(quantityController.text) ?? 1;
+                if (quantity <= 0) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Ingresa una cantidad mayor a 0.')),
+                  );
+                  return;
+                }
+                if (quantity > stockActual) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Solo hay $stockActual unidades disponibles en stock.'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                  return;
+                }
                 Navigator.pop(ctx);
                 _addToCart(product, quantity);
               },
@@ -790,6 +868,46 @@ class _ProductosViewState extends State<ProductosView> {
           ],
         );
       },
+    );
+  }
+
+  void _showEditProductDialog(Map<String, dynamic> product) {
+    showDialog(
+      context: context,
+      builder: (ctx) => _EditProductDialog(
+        product: product,
+        onProductUpdated: (updatedProd) async {
+          await DatabaseHelper.instance.actualizarProducto(
+            updatedProd['id'] as int,
+            nombre: updatedProd['nombre_product'] as String,
+            precio: updatedProd['precio'] as double,
+            stock: updatedProd['cantidad'] as int,
+            imagen: updatedProd['imagen'] as String,
+            categoria: updatedProd['categoria'] as String,
+            descripcion: updatedProd['descripcion'] as String,
+          );
+
+          if (!mounted) return;
+          setState(() {
+            final idx = _products.indexWhere((p) => p['id'] == updatedProd['id']);
+            if (idx != -1) {
+              _products[idx] = {
+                ..._products[idx],
+                ...updatedProd,
+              };
+            }
+          });
+          _actualizarRecomendaciones();
+
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('✅ Producto "${updatedProd['nombre_product']}" actualizado (Stock: ${updatedProd['cantidad']} · \$${(updatedProd['precio'] as double).toStringAsFixed(2)} MXN)'),
+              backgroundColor: AppTheme.exito,
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        },
+      ),
     );
   }
 
@@ -844,6 +962,7 @@ class _ProductosViewState extends State<ProductosView> {
             nuevoProd['nombre_product'],
             nuevoProd['precio'],
             nuevoProd['imagen'],
+            stock: (nuevoProd['cantidad'] is int ? nuevoProd['cantidad'] as int : int.tryParse(nuevoProd['cantidad']?.toString() ?? '0') ?? 0),
             categoria: nuevoProd['categoria'],
             descripcion: nuevoProd['descripcion'],
           );
@@ -890,6 +1009,7 @@ class _AddProductDialog extends StatefulWidget {
 class _AddProductDialogState extends State<_AddProductDialog> {
   final _nombreCtrl = TextEditingController();
   final _precioCtrl = TextEditingController();
+  final _stockCtrl = TextEditingController(text: '100');
   final _catCtrl = TextEditingController(text: 'General');
   final _descCtrl = TextEditingController();
   final _urlCtrl = TextEditingController();
@@ -1184,8 +1304,18 @@ class _AddProductDialogState extends State<_AddProductDialog> {
                 controller: _precioCtrl,
                 keyboardType: const TextInputType.numberWithOptions(decimal: true),
                 decoration: const InputDecoration(
-                  labelText: 'Precio (MXN)',
+                  labelText: 'Costo / Precio (MXN) *',
                   prefixIcon: Icon(Icons.attach_money),
+                ),
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: _stockCtrl,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(
+                  labelText: 'Stock disponible (unidades) *',
+                  prefixIcon: Icon(Icons.numbers_rounded),
+                  helperText: 'Debe ser 0 o mayor (no se permiten negativos)',
                 ),
               ),
               const SizedBox(height: 10),
@@ -1218,11 +1348,24 @@ class _AddProductDialogState extends State<_AddProductDialog> {
           onPressed: () {
             final nombre = _nombreCtrl.text.trim();
             final precio = double.tryParse(_precioCtrl.text) ?? 0.0;
+            final stock = int.tryParse(_stockCtrl.text.trim()) ?? 0;
             final cat = _catCtrl.text.trim();
 
-            if (nombre.isEmpty || precio <= 0) {
+            if (nombre.isEmpty) {
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Por favor ingresa un nombre y precio válido.')),
+                const SnackBar(content: Text('Por favor ingresa un nombre de producto válido.')),
+              );
+              return;
+            }
+            if (precio <= 0) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('El costo/precio debe ser mayor a 0 MXN.')),
+              );
+              return;
+            }
+            if (stock < 0) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('El stock no puede ser negativo (debe ser 0 o más).')),
               );
               return;
             }
@@ -1230,7 +1373,7 @@ class _AddProductDialogState extends State<_AddProductDialog> {
             final nuevoProd = <String, dynamic>{
               'nombre_product': nombre,
               'precio': precio,
-              'cantidad': 1000,
+              'cantidad': stock,
               'imagen': _selectedImage.isEmpty
                   ? 'https://fakestoreapi.com/img/81fPKd-2AYL._AC_SL1500_.jpg'
                   : _selectedImage,
@@ -1250,3 +1393,388 @@ class _AddProductDialogState extends State<_AddProductDialog> {
   }
 }
 
+
+
+/// Diálogo para que el Administrador o Editor modifique un producto existente
+/// (Nombre, Costo/Precio > 0, Stock >= 0 [no negativo], Categoría, Foto, Descripción)
+class _EditProductDialog extends StatefulWidget {
+  final Map<String, dynamic> product;
+  final Function(Map<String, dynamic> updatedProd) onProductUpdated;
+
+  const _EditProductDialog({
+    required this.product,
+    required this.onProductUpdated,
+  });
+
+  @override
+  State<_EditProductDialog> createState() => _EditProductDialogState();
+}
+
+class _EditProductDialogState extends State<_EditProductDialog> {
+  late final TextEditingController _nombreCtrl;
+  late final TextEditingController _precioCtrl;
+  late final TextEditingController _stockCtrl;
+  late final TextEditingController _catCtrl;
+  late final TextEditingController _descCtrl;
+  late final TextEditingController _urlCtrl;
+  final ImagePicker _picker = ImagePicker();
+
+  late String _selectedImage;
+  bool _showUrlInput = false;
+
+  final List<Map<String, String>> _presetPhotos = [
+    {'label': '🎒 Bolso', 'url': 'https://fakestoreapi.com/img/81fPKd-2AYL._AC_SL1500_.jpg'},
+    {'label': '👗 Ropa', 'url': 'https://fakestoreapi.com/img/71-3HjGNDUL._AC_SY879._SX._UX._SY._UY_.jpg'},
+    {'label': '🧥 Chaqueta', 'url': 'https://fakestoreapi.com/img/71li-ujtlUL._AC_UX679_.jpg'},
+    {'label': '💍 Joyería', 'url': 'https://fakestoreapi.com/img/71pWzhdJNwL._AC_UL640_QL65_ML3_.jpg'},
+    {'label': '💎 Anillo', 'url': 'https://fakestoreapi.com/img/61sbMiUnoGL._AC_UL640_QL65_ML3_.jpg'},
+    {'label': '💻 Tech', 'url': 'https://fakestoreapi.com/img/81QpkIctqPL._AC_SX679_.jpg'},
+    {'label': '🎮 SSD', 'url': 'https://fakestoreapi.com/img/61U7T1koQqL._AC_SX679_.jpg'},
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    final p = widget.product;
+    _nombreCtrl = TextEditingController(text: p['nombre_product']?.toString() ?? '');
+    _precioCtrl = TextEditingController(
+      text: p['precio'] is num
+          ? (p['precio'] as num).toStringAsFixed(2)
+          : p['precio']?.toString() ?? '0.00',
+    );
+    _stockCtrl = TextEditingController(text: p['cantidad']?.toString() ?? '0');
+    _catCtrl = TextEditingController(text: p['categoria']?.toString() ?? 'General');
+    _descCtrl = TextEditingController(text: p['descripcion']?.toString() ?? '');
+    _urlCtrl = TextEditingController();
+    _selectedImage = p['imagen']?.toString() ?? '';
+  }
+
+  @override
+  void dispose() {
+    _nombreCtrl.dispose();
+    _precioCtrl.dispose();
+    _stockCtrl.dispose();
+    _catCtrl.dispose();
+    _descCtrl.dispose();
+    _urlCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _pickImage(ImageSource source) async {
+    try {
+      final XFile? photo = await _picker.pickImage(
+        source: source,
+        maxWidth: 1000,
+        maxHeight: 1000,
+        imageQuality: 85,
+      );
+      if (photo != null) {
+        setState(() {
+          _selectedImage = photo.path;
+          _showUrlInput = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('No se pudo acceder a la imagen: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      backgroundColor: AppTheme.dialogBg,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      title: Row(
+        children: [
+          Icon(Icons.edit_note_rounded, color: AppTheme.darkPink),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              'Editar Producto (Admin)',
+              style: TextStyle(
+                color: AppTheme.darkPink,
+                fontWeight: FontWeight.bold,
+                fontSize: 16,
+              ),
+            ),
+          ),
+        ],
+      ),
+      content: SizedBox(
+        width: double.maxFinite,
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                '📸 Foto del Producto:',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 13,
+                  color: AppTheme.darkPink,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Center(
+                child: Stack(
+                  alignment: Alignment.topRight,
+                  children: [
+                    Container(
+                      width: 120,
+                      height: 120,
+                      decoration: BoxDecoration(
+                        color: AppTheme.softPinkBg,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: AppTheme.cardBorderPink, width: 2),
+                      ),
+                      child: ProductImage(
+                        imageSource: _selectedImage,
+                        width: 120,
+                        height: 120,
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                    ),
+                    if (_selectedImage.isNotEmpty)
+                      GestureDetector(
+                        onTap: () => setState(() => _selectedImage = ''),
+                        child: Container(
+                          margin: const EdgeInsets.all(4),
+                          padding: const EdgeInsets.all(4),
+                          decoration: const BoxDecoration(
+                            color: Colors.red,
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(Icons.close, size: 14, color: Colors.white),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 10),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                      side: BorderSide(color: AppTheme.darkPink),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                    icon: Icon(Icons.camera_alt_rounded, size: 16, color: AppTheme.darkPink),
+                    label: Text('Cámara', style: TextStyle(fontSize: 11, color: AppTheme.darkPink)),
+                    onPressed: () => _pickImage(ImageSource.camera),
+                  ),
+                  OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                      side: BorderSide(color: AppTheme.darkPink),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                    icon: Icon(Icons.photo_library_rounded, size: 16, color: AppTheme.darkPink),
+                    label: Text('Galería', style: TextStyle(fontSize: 11, color: AppTheme.darkPink)),
+                    onPressed: () => _pickImage(ImageSource.gallery),
+                  ),
+                  OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                      side: BorderSide(color: AppTheme.darkPink),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                    icon: Icon(Icons.link_rounded, size: 16, color: AppTheme.darkPink),
+                    label: Text('URL', style: TextStyle(fontSize: 11, color: AppTheme.darkPink)),
+                    onPressed: () => setState(() => _showUrlInput = !_showUrlInput),
+                  ),
+                ],
+              ),
+              if (_showUrlInput) ...[
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: _urlCtrl,
+                        decoration: InputDecoration(
+                          hintText: 'https://...',
+                          labelText: 'URL de imagen',
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    ElevatedButton(
+                      onPressed: () {
+                        if (_urlCtrl.text.trim().isNotEmpty) {
+                          setState(() {
+                            _selectedImage = _urlCtrl.text.trim();
+                            _showUrlInput = false;
+                          });
+                        }
+                      },
+                      child: const Text('OK'),
+                    ),
+                  ],
+                ),
+              ],
+              const SizedBox(height: 8),
+              const Text(
+                'O elige una foto de muestra:',
+                style: TextStyle(fontSize: 11, color: Colors.grey, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 6),
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: _presetPhotos.map((preset) {
+                    final isSelected = _selectedImage == preset['url'];
+                    return GestureDetector(
+                      onTap: () {
+                        setState(() {
+                          _selectedImage = preset['url']!;
+                        });
+                      },
+                      child: Container(
+                        margin: const EdgeInsets.only(right: 8),
+                        padding: const EdgeInsets.all(4),
+                        decoration: BoxDecoration(
+                          color: isSelected ? AppTheme.softPinkBg : Colors.grey.shade50,
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                            color: isSelected ? AppTheme.darkPink : Colors.grey.shade300,
+                            width: isSelected ? 2 : 1,
+                          ),
+                        ),
+                        child: Column(
+                          children: [
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(6),
+                              child: Image.network(
+                                preset['url']!,
+                                width: 44,
+                                height: 44,
+                                fit: BoxFit.cover,
+                                errorBuilder: (ctx, err, stack) => const Icon(Icons.image, size: 24),
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              preset['label']!,
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                                color: isSelected ? AppTheme.darkPink : Colors.black87,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ),
+              const Divider(height: 24),
+              TextField(
+                controller: _nombreCtrl,
+                decoration: const InputDecoration(
+                  labelText: 'Nombre del producto *',
+                  prefixIcon: Icon(Icons.inventory_2_outlined),
+                ),
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: _precioCtrl,
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                decoration: const InputDecoration(
+                  labelText: 'Costo / Precio en MXN *',
+                  prefixIcon: Icon(Icons.attach_money),
+                ),
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: _stockCtrl,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(
+                  labelText: 'Stock disponible (unidades) *',
+                  prefixIcon: Icon(Icons.numbers_rounded),
+                  helperText: 'Debe ser 0 o mayor (no se permiten negativos)',
+                ),
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: _catCtrl,
+                decoration: const InputDecoration(
+                  labelText: 'Categoría',
+                  prefixIcon: Icon(Icons.category_outlined),
+                ),
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: _descCtrl,
+                maxLines: 2,
+                decoration: const InputDecoration(
+                  labelText: 'Descripción',
+                  prefixIcon: Icon(Icons.notes_rounded),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancelar'),
+        ),
+        ElevatedButton(
+          onPressed: () {
+            final nombre = _nombreCtrl.text.trim();
+            final precio = double.tryParse(_precioCtrl.text.trim()) ?? 0.0;
+            final stockStr = _stockCtrl.text.trim();
+            final stock = int.tryParse(stockStr);
+
+            if (nombre.isEmpty) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('El nombre del producto no puede estar vacío.')),
+              );
+              return;
+            }
+            if (precio <= 0) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('El costo/precio debe ser mayor a 0 MXN.')),
+              );
+              return;
+            }
+            if (stock == null || stock < 0) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('El stock no puede ser negativo (debe ser 0 o mayor).')),
+              );
+              return;
+            }
+
+            final updated = <String, dynamic>{
+              'id': widget.product['id'],
+              'nombre_product': nombre,
+              'precio': precio,
+              'cantidad': stock,
+              'imagen': _selectedImage,
+              'categoria': _catCtrl.text.trim().isEmpty ? 'General' : _catCtrl.text.trim(),
+              'descripcion': _descCtrl.text.trim(),
+            };
+
+            Navigator.pop(context);
+            widget.onProductUpdated(updated);
+          },
+          child: const Text('Guardar Cambios'),
+        ),
+      ],
+    );
+  }
+}

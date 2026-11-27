@@ -144,6 +144,24 @@ class _AjustesViewState extends State<AjustesView> {
                     label: '${(_settings.escalaTexto * 100).round()} %',
                     onChanged: (v) => _settings.setEscalaTexto(v),
                   ),
+                  const Divider(height: 24),
+                  SwitchListTile(
+                    contentPadding: EdgeInsets.zero,
+                    secondary: Icon(
+                      _settings.modoOscuro ? Icons.dark_mode_rounded : Icons.light_mode_rounded,
+                      color: AppTheme.darkPink,
+                    ),
+                    title: const Text('Modo Oscuro', style: TextStyle(fontWeight: FontWeight.w600)),
+                    subtitle: Text(
+                      _settings.modoOscuro
+                          ? 'Tema oscuro activado para descansar la vista'
+                          : 'Tema claro con tonos pastel',
+                      style: const TextStyle(fontSize: 12),
+                    ),
+                    value: _settings.modoOscuro,
+                    activeColor: AppTheme.darkPink,
+                    onChanged: (v) => _settings.setModoOscuro(v),
+                  ),
                 ],
               ),
             ),

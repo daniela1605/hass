@@ -39,6 +39,7 @@ class AppSettings extends ChangeNotifier {
   bool _notifPromociones = true;
   int? _biometriaUsuarioId;
   String _canal2fa = 'email';
+  bool _modoOscuro = false;
 
   Paleta get paleta => _paleta;
   double get escalaTexto => _escalaTexto;
@@ -47,6 +48,7 @@ class AppSettings extends ChangeNotifier {
   bool get notifPromociones => _notifPromociones;
   int? get biometriaUsuarioId => _biometriaUsuarioId;
   String get canal2fa => _canal2fa;
+  bool get modoOscuro => _modoOscuro;
 
   Future<void> cargar() async {
     _prefs = await SharedPreferences.getInstance();
@@ -57,6 +59,13 @@ class AppSettings extends ChangeNotifier {
     _notifPromociones = _prefs.getBool('cfg_notif_promos') ?? true;
     _biometriaUsuarioId = _prefs.getInt('cfg_bio_usuario');
     _canal2fa = _prefs.getString('cfg_canal_2fa') ?? 'email';
+    _modoOscuro = _prefs.getBool('cfg_modo_oscuro') ?? false;
+  }
+
+  Future<void> setModoOscuro(bool v) async {
+    _modoOscuro = v;
+    await _prefs.setBool('cfg_modo_oscuro', v);
+    notifyListeners();
   }
 
   Future<void> setPaleta(Paleta p) async {
