@@ -147,6 +147,36 @@ class MailHelper {
     return sendEmail(destino, asunto, mensaje, htmlContent: htmlContent);
   }
 
+  /// Correo de bienvenida y entrega de credenciales a un nuevo usuario registrado
+  static Future<bool> sendWelcomeEmail({
+    required String destino,
+    required String nombre,
+    required String username,
+    required String password,
+    required String rol,
+  }) async {
+    final asunto = '🌸 ¡Bienvenid@ a ${AppConfig.appName}! - Tus datos de acceso';
+    final mensaje =
+        'Hola $nombre, tu cuenta en ${AppConfig.appName} ha sido creada. Usuario: $username, Contraseña temporal: $password, Rol: $rol.';
+    final htmlContent = _plantilla('🌸 ¡Bienvenid@ a ${AppConfig.appName}!', """
+      <p style="font-size:16px;">Hola <strong>$nombre</strong>,</p>
+      <p>Tu cuenta ha sido creada exitosamente en <strong>${AppConfig.appName}</strong>. A continuación tienes tus datos de acceso:</p>
+      <div style="background:#FFF2F5; border-radius:12px; padding:18px; margin:18px 0; border: 1px solid #F8BBD0;">
+        <p style="margin:6px 0;"><strong>👤 Nombre de usuario:</strong> $username</p>
+        <p style="margin:6px 0;"><strong>📧 Correo electrónico:</strong> $destino</p>
+        <p style="margin:6px 0;"><strong>🔑 Contraseña temporal:</strong> <span style="font-family:monospace; background:#fff; padding:2px 8px; border-radius:4px; font-weight:bold; color:#EC407A;">$password</span></p>
+        <p style="margin:6px 0;"><strong>🏷️ Tipo de cuenta (Rol):</strong> $rol</p>
+      </div>
+      <p style="text-align:center; color:#555;">Puedes acceder a la tienda desde cualquier dispositivo ingresando tu usuario o correo y tu contraseña.</p>
+      <div style="text-align:center; margin:20px 0;">
+        <a href="https://hass-tiendita.onrender.com" style="background:#EC407A; color:white; padding:12px 24px; border-radius:10px; text-decoration:none; font-weight:bold; display:inline-block;">Entrar a Mi Tiendita</a>
+      </div>
+      <p style="font-size:12px; color:#888; text-align:center;">Por seguridad, te recomendamos cambiar tu contraseña temporal después de tu primer inicio de sesión en Ajustes ➔ Cambiar contraseña.</p>
+    """);
+
+    return sendEmail(destino, asunto, mensaje, htmlContent: htmlContent);
+  }
+
   /// Alerta de seguridad (contraseña cambiada, cuenta bloqueada, etc.).
   static Future<bool> sendSecurityAlertEmail(
       String destino, String titulo, String mensaje) {

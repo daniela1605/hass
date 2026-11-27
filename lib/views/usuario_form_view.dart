@@ -1,4 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:share_plus/share_plus.dart';
+import 'package:url_launcher/url_launcher.dart';
+import '../config/app_config.dart';
+import '../services/mail_helper.dart';
 import '../controllers/usuario_controller.dart';
 import '../models/usuario.dart';
 import '../services/otp_service.dart';
@@ -145,8 +149,151 @@ class _UsuarioFormViewState extends State<UsuarioFormView> {
     );
 
     if (exito && mounted) {
-      Navigator.pop(context, true);
+      final userFinal = username.trim().isEmpty ? email.split('@').first : username.trim();
+      // Enviar correo de bienvenida con credenciales
+      try {
+        MailHelper.sendWelcomeEmail(
+          destino: email,
+          nombre: nombre,
+          username: userFinal,
+          password: pass,
+          rol: rol,
+        );
+      } catch (e) {
+        debugPrint('Error enviando correo de bienvenida: $e');
+      }
+
+      if (widget.esAdmin) {
+        await _mostrarExitoAdminDialog(
+          nombre: nombre,
+          email: email,
+          username: userFinal,
+          password: pass,
+          rol: rol,
+        );
+      }
+
+      if (mounted) Navigator.pop(context, true);
     }
+  }
+
+  Future<void> _mostrarExitoAdminDialog({
+    required String nombre,
+    required String email,
+    required String username,
+    required String password,
+    required String rol,
+  }) {
+    return showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Row(
+          children: [
+            CircleAvatar(
+              radius: 18,
+              backgroundColor: const Color(0xFFE8F5E9),
+              child: const Icon(Icons.check_circle_rounded, color: Color(0xFF4CAF50), size: 24),
+            ),
+            const SizedBox(width: 10),
+            const Expanded(
+              child: Text('¡Usuario Registrado!', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            ),
+          ],
+        ),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Se creó la cuenta para $nombre con el rol "$rol".'),
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: AppTheme.softPinkBg,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: AppTheme.cardBorderPink),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('👤 Usuario: $username', style: const TextStyle(fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 4),
+                    Text('📧 Correo: $email'),
+                    const SizedBox(height: 4),
+                    Text('🔑 Contraseña: $password', style: TextStyle(color: AppTheme.darkPink, fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 4),
+                    Text('🏷️ Rol: $rol'),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 14),
+              const Text('Puedes enviar o compartir los datos de acceso con el usuario:', style: TextStyle(fontSize: 12.5, color: Colors.grey)),
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: const Color(0xFF25D366),
+                        side: const BorderSide(color: Color(0xFF25D366)),
+                      ),
+                      icon: const Icon(Icons.share_rounded, size: 18),
+                      label: const Text('WhatsApp'),
+                      onPressed: () {
+                        final mensaje = '🌸 ¡Hola $nombre! Tu cuenta en ${AppConfig.appName} ha sido creada:\n\n'
+                            '👤 Usuario: $username\n'
+                            '📧 Correo: $email\n'
+                            '🔑 Contraseña: $password\n'
+                            '🏷️ Rol: $rol\n\n'
+                            'Puedes entrar en: https://hass-tiendita.onrender.com';
+                        SharePlus.instance.share(ShareParams(text: mensaje, subject: 'Datos de acceso - ${AppConfig.appName}'));
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: const Color(0xFFD93025),
+                        side: const BorderSide(color: Color(0xFFD93025)),
+                      ),
+                      icon: const Icon(Icons.mail_rounded, size: 18),
+                      label: const Text('Gmail'),
+                      onPressed: () async {
+                        final asunto = Uri.encodeComponent('🌸 ¡Bienvenid@ a ${AppConfig.appName}! - Tus datos de acceso');
+                        final cuerpo = Uri.encodeComponent(
+                          'Hola $nombre,\n\n'
+                          'Tu cuenta en ${AppConfig.appName} está lista. Aquí tienes tus datos:\n\n'
+                          'Usuario: $username\n'
+                          'Correo: $email\n'
+                          'Contraseña: $password\n'
+                          'Rol: $rol\n\n'
+                          'Acceso: https://hass-tiendita.onrender.com\n\n'
+                          '¡Bienvenido!'
+                        );
+                        final url = Uri.parse('https://mail.google.com/mail/?view=cm&fs=1&to=$email&su=$asunto&body=$cuerpo');
+                        if (await canLaunchUrl(url)) {
+                          await launchUrl(url, mode: LaunchMode.externalApplication);
+                        }
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Aceptar y Finalizar'),
+          ),
+        ],
+      ),
+    );
   }
 
   /// Diálogo para validar el correo. Devuelve `true` si el código es correcto.

@@ -136,7 +136,7 @@ class OtpService {
       canal: canal,
       destinoOculto: canal == CanalOtp.sms ? telefonoOculto : (emailOculto.isEmpty ? email : emailOculto),
       vence: vence,
-      codigoDemo: enviado ? null : codigo,
+      codigoDemo: (!enviado || kIsWeb) ? codigo : null,
     );
   }
 
